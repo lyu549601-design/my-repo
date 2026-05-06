@@ -1,4 +1,4 @@
-# 🚀 AI Engineering Projects: LLM Security & RAG Evaluation
+# 🚀 人工智能工程项目：LLM安全与RAG评估
 
 本仓库包含我在大模型工程落地与评测领域的两个核心实战项目，致力于解决大模型在实际应用中的**安全对齐、并发调度与幻觉评估**问题。
 
