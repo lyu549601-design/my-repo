@@ -1,0 +1,43 @@
+services:
+  memory-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8084:8084"
+    environment:
+      - APP_ENV=production
+      - APP_PORT=8084
+      - POSTGRES_URL=postgresql://postgres:password@postgres:5432/multiagent
+      - REDIS_URL=redis://redis:6379/0
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-local}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-small-zh-v1.5}
+      - EMBEDDING_DIM=${EMBEDDING_DIM:-512}
+      - MEMORY_TOKEN_BUDGET=${MEMORY_TOKEN_BUDGET:-1600}
+      - MEMORY_RETRIEVAL_TOP_K=${MEMORY_RETRIEVAL_TOP_K:-3}
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg15
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=multiagent
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    volumes:
+      - memory-pg-data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+    restart: unless-stopped
+
+volumes:
+  memory-pg-data:
