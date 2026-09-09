@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: multi-agent
+data:
+  APP_ENV: "production"
+  APP_HOST: "0.0.0.0"
+  APP_PORT: "8000"
+  REDIS_URL: "redis://redis:6379/0"
+  POSTGRES_URL: "postgresql://postgres:password@postgres:5432/multiagent"
+  SEARCH_MCP_URL: "http://search-mcp:8080"
+  FINANCIAL_MCP_URL: "http://financial-mcp:8080"
+  CLEANER_MCP_URL: "http://cleaner-mcp:8080"
+  MAX_RETRIES: "3"
+  QUALITY_THRESHOLD: "0.8"
+  LOG_LEVEL: "INFO"

@@ -1,0 +1,159 @@
+services:
+  # ============================================
+  # 应用服务
+  # ============================================
+  
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - REDIS_URL=redis://redis:6379/0
+      - POSTGRES_URL=postgresql://postgres:password@postgres:5432/multiagent
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - MEMORY_SERVICE_URL=http://memory-service:8084
+      - SEARCH_MCP_URL=http://search-mcp:8080
+      - FINANCIAL_MCP_URL=http://financial-mcp:8080
+      - CLEANER_MCP_URL=http://cleaner-mcp:8080
+    depends_on:
+      - redis
+      - postgres
+      - search-mcp
+      - financial-mcp
+      - cleaner-mcp
+      - memory-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  memory-service:
+    build:
+      context: ../agent-memory-service
+      dockerfile: Dockerfile
+    ports:
+      - "8084:8084"
+    environment:
+      - APP_ENV=production
+      - APP_PORT=8084
+      - POSTGRES_URL=postgresql://postgres:password@postgres:5432/multiagent
+      - REDIS_URL=redis://redis:6379/0
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-local}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-small-zh-v1.5}
+      - EMBEDDING_DIM=${EMBEDDING_DIM:-512}
+      - MEMORY_TOKEN_BUDGET=${MEMORY_TOKEN_BUDGET:-1600}
+      - MEMORY_RETRIEVAL_TOP_K=${MEMORY_RETRIEVAL_TOP_K:-3}
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  # ============================================
+  # MCP工具服务器
+  # ============================================
+
+  search-mcp:
+    build:
+      context: ./mcp-servers/search-server
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080"
+    environment:
+      - SERPAPI_KEY=${SERPAPI_KEY}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  financial-mcp:
+    build:
+      context: ./mcp-servers/financial-server
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8080"
+    environment:
+      - TUSHARE_TOKEN=${TUSHARE_TOKEN}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  cleaner-mcp:
+    build:
+      context: ./mcp-servers/cleaner-server
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================
+  # 数据存储
+  # ============================================
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  postgres:
+    image: pgvector/pgvector:pg15
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=multiagent
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============================================
+  # 监控（可选）
+  # ============================================
+
+  langfuse:
+    image: langfuse/langfuse:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET:-secret}
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/langfuse
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+volumes:
+  redis-data:
+  postgres-data:
